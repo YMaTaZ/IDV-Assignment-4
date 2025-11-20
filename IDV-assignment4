@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js 数据可视化 - 攻击方法性能分析</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button.active {
+            background: #764ba2;
+            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+        }
+        
+        .chart-container {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .chart-container.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        #heatmap, #barchart {
+            width: 100%;
+            height: auto;
+        }
+        
+        .tooltip {
+            position: absolute;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 13px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            white-space: nowrap;
+        }
+        
+        .axis-label {
+            font-size: 12px;
+            fill: #333;
+        }
+        
+        .legend {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .filter-info {
+            text-align: center;
+            margin: 15px 0;
+            color: #764ba2;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .reset-btn {
+            background: #ff6b6b;
+        }
+        
+        .reset-btn:hover {
+            background: #ee5a52;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 攻击方法性能分析系统</h1>
+        <p class="subtitle">基于多种攻击类型和防御方法的准确率对比</p>
+        
+        <div class="controls">
+            <button class="chart-btn active" data-chart="heatmap">📊 热力图</button>
+            <button class="chart-btn" data-chart="barchart">📈 分组柱状图</button>
+            <button class="reset-btn" id="resetBtn">🔄 重置过滤</button>
+        </div>
+        
+        <div id="filterInfo" class="filter-info"></div>
+        
+        <div id="heatmap" class="chart-container active"></div>
+        <div id="barchart" class="chart-container"></div>
+    </div>
+    
+    <script>
+        // 数据定义
+        const rawData = [
+            { Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23 },
+            { Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80 },
+            { Attack: "MIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.90, TRADES: 51.90, MART: 50.50, RS: 5.80, IBP: 38.10, PRL: 0.00, TandT: 92.80 },
+            { Attack: "DIFGSM", ERM: 1.00, DA: 0.00, PGDT: 51.75, TRADES: 50.50, MART: 53.60, RS: 4.10, IBP: 38.10, PRL: 3.10, TandT: 92.80 },
+            { Attack: "VMIFGSM", ERM: 0.00, DA: 0.00, PGDT: 51.10, TRADES: 50.90, MART: 51.90, RS: 4.10, IBP: 38.10, PRL: 0.00, TandT: 93.90 },
+            { Attack: "TPGD", ERM: 38.10, DA: 39.20, PGDT: 69.30, TRADES: 69.10, MART: 70.10, RS: 48.50, IBP: 50.00, PRL: 28.90, TandT: 91.80 },
+            { Attack: "FGSM", ERM: 29.90, DA: 25.80, PGDT: 57.95, TRADES: 54.60, MART: 61.90, RS: 28.90, IBP: 38.10, PRL: 25.80, TandT: 93.80 },
+            { Attack: "RFGSM", ERM: 0.00, DA: 0.00, PGDT: 49.15, TRADES: 50.40, MART: 48.50, RS: 3.70, IBP: 38.10, PRL: 0.00, TandT: 90.00 },
+            { Attack: "BIM", ERM: 0.00, DA: 0.00, PGDT: 52.00, TRADES: 57.20, MART: 47.40, RS: 2.10, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
+            { Attack: "FAB", ERM: 1.00, DA: 2.10, PGDT: 43.00, TRADES: 46.40, MART: 40.20, RS: 5.30, IBP: 38.10, PRL: 4.10, TandT: 90.10 },
+            { Attack: "CW", ERM: 0.00, DA: 0.00, PGDT: 32.20, TRADES: 35.10, MART: 29.90, RS: 1.00, IBP: 40.20, PRL: 1.00, TandT: 92.90 },
+            { Attack: "UPGD", ERM: 0.00, DA: 0.00, PGDT: 49.85, TRADES: 50.50, MART: 49.80, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 93.80 },
+            { Attack: "FFGSM", ERM: 19.60, DA: 23.70, PGDT: 60.55, TRADES: 55.70, MART: 66.00, RS: 33.00, IBP: 42.30, PRL: 29.90, TandT: 92.80 },
+            { Attack: "Jitter", ERM: 11.30, DA: 12.40, PGDT: 48.15, TRADES: 47.40, MART: 49.50, RS: 34.00, IBP: 39.20, PRL: 24.70, TandT: 90.70 },
+            { Attack: "PGD", ERM: 0.00, DA: 0.00, PGDT: 57.40, TRADES: 54.60, MART: 60.80, RS: 7.20, IBP: 40.20, PRL: 0.00, TandT: 91.80 },
+            { Attack: "EOTPGD", ERM: 0.00, DA: 0.00, PGDT: 50.10, TRADES: 50.30, MART: 50.50, RS: 3.00, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
+            { Attack: "APGD", ERM: 0.00, DA: 0.00, PGDT: 48.40, TRADES: 51.00, MART: 46.40, RS: 1.00, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
+            { Attack: "NIFGSM", ERM: 0.00, DA: 0.00, PGDT: 57.95, TRADES: 56.70, MART: 59.80, RS: 7.20, IBP: 38.10, PRL: 1.00, TandT: 92.80 },
+            { Attack: "SiniFCSM", ERM: 4.10, DA: 1.00, PGDT: 59.00, TRADES: 56.70, MART: 61.90, RS: 23.70, IBP: 38.10, PRL: 12.40, TandT: 93.70 },
+            { Attack: "VNIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.45, TRADES: 53.00, MART: 48.50, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 92.90 },
+            { Attack: "APGDT", ERM: 0.00, DA: 0.00, PGDT: 40.90, TRADES: 44.30, MART: 38.10, RS: 0.00, IBP: 38.10, PRL: 0.00, TandT: 88.70 },
+            { Attack: "Square", ERM: 0.00, DA: 1.00, PGDT: 50.40, TRADES: 54.00, MART: 47.40, RS: 3.10, IBP: 38.10, PRL: 2.10, TandT: 88.08 },
+            { Attack: "Add Gaussian Noise", ERM: 25.80, DA: 43.30, PGDT: 79.10, TRADES: 78.40, MART: 80.40, RS: 74.20, IBP: 42.30, PRL: 45.40, TandT: 87.60 },
+            { Attack: "OnePixel", ERM: 79.40, DA: 83.50, PGDT: 78.05, TRADES: 74.20, MART: 82.50, RS: 83.50, IBP: 42.50, PRL: 80.40, TandT: 89.70 },
+            { Attack: "Pixle", ERM: 0.00, DA: 0.00, PGDT: 12.55, TRADES: 11.30, MART: 14.40, RS: 1.00, IBP: 10.30, PRL: 0.00, TandT: 17.50 },
+            { Attack: "PGDL2", ERM: 1.00, DA: 0.00, PGDT: 35.80, TRADES: 36.10, MART: 36.10, RS: 5.20, IBP: 36.10, PRL: 0.00, TandT: 92.90 }
+        ];
+        
+        const methods = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
+        let filteredData = JSON.parse(JSON.stringify(rawData));
+        let selectedMethod = null;
+        
+        // 创建工具提示
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+        
+        // 热力图函数
+        function drawHeatmap() {
+            const margin = { top: 40, right: 30, bottom: 150, left: 120 };
+            const width = 1200 - margin.left - margin.right;
+            const height = 600 - margin.top - margin.bottom;
+            
+            d3.select("#heatmap").html("");
+            
+            const svg = d3.select("#heatmap").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+            
+            // 数据转换
+            const heatmapData = [];
+            filteredData.forEach(d => {
+                methods.forEach(method => {
+                    heatmapData.push({
+                        attack: d.Attack,
+                        method: method,
+                        value: d[method]
+                    });
+                });
+            });
+            
+            // 比例尺
+            const xScale = d3.scaleBand()
+                .domain(methods)
+                .range([0, width])
+                .padding(0.02);
+            
+            const yScale = d3.scaleBand()
+                .domain(filteredData.map(d => d.Attack))
+                .range([0, height])
+                .padding(0.02);
+            
+            const colorScale = d3.scaleLinear()
+                .domain([0, 50, 100])
+                .range(["#d73027", "#fee090", "#1a9850"]);
+            
+            // 绘制单元格
+            svg.selectAll("rect")
+                .data(heatmapData)
+                .enter()
+                .append("rect")
+                .attr("x", d => xScale(d.method))
+                .attr("y", d => yScale(d.attack))
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .attr("fill", "#f0f0f0")
+                .transition()
+                .duration(1000)
+                .attr("fill", d => colorScale(d.value))
+                .on("end", function() {
+                    d3.select(this).style("cursor", "pointer");
+                });
+            
+            // 交互功能
+            svg.selectAll("rect")
+                .on("mouseover", function(event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "#333")
+                        .attr("stroke-width", 2);
+                    
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0.95);
+                    
+                    tooltip.html(`<strong>${d.method}</strong><br/>攻击: ${d.attack}<br/>准确率: ${d.value.toFixed(2)}%`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("stroke", "none");
+                    
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0);
+                });
+            
+            // X轴
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                .attr("transform", "rotate(45)")
+                .attr("text-anchor", "start")
+                .attr("class", "axis-label");
+            
+            // Y轴
+            svg.append("g")
+                .call(d3.axisLeft(yScale))
+                .selectAll("text")
+                .attr("class", "axis-label");
+            
+            // 图例
+            const legendData = [
+                { value: 0, label: "0%" },
+                { value: 50, label: "50%" },
+                { value: 100, label: "100%" }
+            ];
+            
+            const legend = svg.append("g")
+                .attr("transform", `translate(${width + 20}, 0)`);
+            
+            legend.selectAll("rect")
+                .data(legendData)
+                .enter()
+                .append("rect")
+                .attr("x", 0)
+                .attr("y", (d, i) => i * 30)
+                .attr("width", 20)
+                .attr("height", 20)
+                .attr("fill", d => colorScale(d.value));
+            
+            legend.selectAll("text")
+                .data(legendData)
+                .enter()
+                .append("text")
+                .attr("x", 30)
+                .attr("y", (d, i) => i * 30 + 15)
+                .attr("font-size", "12px")
+                .text(d => d.label);
+        }
+        
+        // 分组柱状图函数
+        function drawBarchart() {
+            const margin = { top: 40, right: 30, bottom: 80, left: 80 };
+            const width = 1200 - margin.left - margin.right;
+            const height = 600 - margin.top - margin.bottom;
+            
+            d3.select("#barchart").html("");
+            
+            const svg = d3.select("#barchart").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+            
+            // 比例尺
+            const xScale = d3.scaleBand()
+                .domain(filteredData.map(d => d.Attack))
+                .range([0, width])
+                .padding(0.1);
+            
+            const subXScale = d3.scaleBand()
+                .domain(methods)
+                .range([0, xScale.bandwidth()])
+                .padding(0.05);
+            
+            const yScale = d3.scaleLinear()
+                .domain([0, 100])
+                .range([height, 0]);
+            
+            const colorScale = d3.scaleOrdinal()
+                .domain(methods)
+                .range(d3.schemeSet2);
+            
+            // 绘制柱子
+            svg.selectAll("g.attack")
+                .data(filteredData)
+                .enter()
+                .append("g")
+                .attr("class", "attack")
+                .attr("transform", d => `translate(${xScale(d.Attack)},0)`)
+                .selectAll("rect")
+                .data(d => methods.map(method => ({ method, value: d[method], attack: d.Attack })))
+                .enter()
+                .append("rect")
+                .attr("x", d => subXScale(d.method))
+                .attr("y", height)
+                .attr("width", subXScale.bandwidth())
+                .attr("height", 0)
+                .attr("fill", d => colorScale(d.method))
+                .transition()
+                .duration(1000)
+                .delay((d, i) => i * 50)
+                .attr("y", d => yScale(d.value))
+                .attr("height", d => height - yScale(d.value));
+            
+            // 交互功能
+            svg.selectAll("rect")
+                .on("mouseover", function(event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("opacity", 0.7)
+                        .attr("stroke", "#333")
+                        .attr("stroke-width", 2);
+                    
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0.95);
+                    
+                    tooltip.html(`<strong>${d.method}</strong><br/>攻击: ${d.attack}<br/>准确率: ${d.value.toFixed(2)}%`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("opacity", 1)
+                        .attr("stroke", "none");
+                    
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0);
+                });
+            
+            // X轴
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                .attr("transform", "rotate(45)")
+                .attr("text-anchor", "start")
+                .attr("class", "axis-label");
+            
+            // Y轴
+            svg.append("g")
+                .call(d3.axisLeft(yScale))
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("准确率 (%)")
+                .attr("class", "axis-label");
+            
+            // 图例
+            const legend = svg.append("g")
+                .attr("transform", `translate(${width - 150}, -30)`);
+            
+            legend.selectAll("rect")
+                .data(methods)
+                .enter()
+                .append("rect")
+                .attr("x", 0)
+                .attr("y", (d, i) => i * 20)
+                .attr("width", 15)
+                .attr("height", 15)
+                .attr("fill", d => colorScale(d));
+            
+            legend.selectAll("text")
+                .data(methods)
+                .enter()
+                .append("text")
+                .attr("x", 20)
+                .attr("y", (d, i) => i * 20 + 12)
+                .attr("font-size", "12px")
+                .text(d => d);
+        }
+        
+        // 事件监听
+        document.querySelectorAll(".chart-btn").forEach(btn => {
+            btn.addEventListener("click", function() {
+                document.querySelectorAll(".chart-btn").forEach(b => b.classList.remove("active"));
+                this.classList.add("active");
+                
+                document.querySelectorAll(".chart-container").forEach(c => c.classList.remove("active"));
+                
+                const chart = this.dataset.chart;
+                if (chart === "heatmap") {
+                    document.getElementById("heatmap").classList.add("active");
+                    drawHeatmap();
+                } else {
+                    document.getElementById("barchart").classList.add("active");
+                    drawBarchart();
+                }
+            });
+        });
+        
+        document.getElementById("resetBtn").addEventListener("click", function() {
+            filteredData = JSON.parse(JSON.stringify(rawData));
+            selectedMethod = null;
+            updateFilterInfo();
+            drawHeatmap();
+        });
+        
+        function updateFilterInfo() {
+            const info = document.getElementById("filterInfo");
+            if (selectedMethod) {
+                info.textContent = `✓ 已过滤: 仅显示 ${selectedMethod} 方法的数据 | 共 ${filteredData.length} 种攻击类型`;
+            } else {
+                info.textContent = `显示全部 ${filteredData.length} 种攻击类型 × ${methods.length} 种防御方法`;
+            }
+        }
+        
+        // 初始化
+        updateFilterInfo();
+        drawHeatmap();
+    </script>
+</body>
+</html>
