@@ -1,633 +1,334 @@
+这是一份完全符合IDV Assignment 4要求的HTML文件。你可以直接将其部署在GitHub Pages上。
+
+### 代码说明：
+1.  **数据处理 (Data Options)**: 我已经手动将图片中的表格数据（Data Option 2: Lots of Data）完整转录为JSON格式，并嵌入代码中。
+2.  **图表选择**: 选择了 **Heatmap (热力图)**。
+    *   *原因*: 数据是一个 $26 \times 9$ 的矩阵，热力图最适合展示这种密集数据，可以通过颜色的深浅直观地对比不同攻击方式（行）下不同模型（列）的表现（数值越高颜色越绿/深）。
+3.  **交互 (Interaction)**:
+    *   **Tooltip**: 鼠标悬停在方格上时，会显示具体的数值、攻击类型和模型名称。
+    *   **Highlight**: 悬停时，当前方格高亮，且对应的X轴和Y轴标签会变粗变色，帮助视线定位。
+4.  **过渡动画 (Transition)**:
+    *   图表加载时，方格会按照对角线顺序依次浮现（Opacity fade-in），满足"non-interaction-triggered transition"的要求。
+
+### 使用方法：
+1.  新建一个文件，命名为 `index.html`。
+2.  将下面的代码完整复制进去。
+3.  将该文件上传到你的 GitHub 仓库，并开启 GitHub Pages 即可预览。
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D3.js Interactive Data Visualization - Attack Defense Performance Analysis</title>
+    <title>IDV Assignment 4: Robustness Visualization</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
             padding: 20px;
         }
-        
-        .main-container {
-            max-width: 1600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 20px;
-        }
-        
+
         h1 {
             color: #333;
-            font-size: 32px;
             margin-bottom: 10px;
-            font-weight: 700;
         }
-        
-        .subtitle {
+
+        p {
             color: #666;
-            font-size: 16px;
-            font-weight: 500;
-        }
-        
-        .description {
-            color: #888;
-            font-size: 14px;
-            margin-top: 10px;
-            font-style: italic;
-        }
-        
-        .controls-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
+            max-width: 800px;
+            text-align: center;
             margin-bottom: 30px;
-            flex-wrap: wrap;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
         }
-        
-        .control-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .control-group label {
-            font-weight: 600;
-            color: #333;
-            display: flex;
-            align-items: center;
-            margin-right: 10px;
-        }
-        
-        button {
-            padding: 12px 24px;
-            border: 2px solid #667eea;
-            border-radius: 8px;
+
+        #chart-container {
             background: white;
-            color: #667eea;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 20px;
         }
-        
-        button:hover {
-            background: #667eea;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        button.active {
-            background: #667eea;
-            color: white;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-        }
-        
-        .reset-btn {
-            border-color: #ff6b6b;
-            color: #ff6b6b;
-        }
-        
-        .reset-btn:hover {
-            background: #ff6b6b;
-            color: white;
-        }
-        
-        .info-panel {
-            background: #e7f3ff;
-            border-left: 4px solid #667eea;
-            padding: 15px 20px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #333;
-        }
-        
-        .info-panel strong {
-            color: #667eea;
-        }
-        
-        .chart-wrapper {
-            display: none;
-            animation: slideIn 0.6s ease-in-out;
-        }
-        
-        .chart-wrapper.active {
-            display: block;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .chart-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-        }
-        
+
+        /* Tooltip Styling */
         .tooltip {
             position: absolute;
-            padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            border-radius: 8px;
-            pointer-events: none;
-            font-size: 13px;
-            z-index: 1000;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-            white-space: nowrap;
-            font-weight: 500;
-        }
-        
-        .axis-label {
-            font-size: 12px;
-            fill: #333;
-        }
-        
-        .axis-title {
-            font-size: 14px;
-            fill: #333;
-            font-weight: 600;
-        }
-        
-        .legend {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #666;
-        }
-        
-        .legend-title {
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 2px solid #f0f0f0;
-        }
-        
-        .stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
             text-align: center;
-            border-left: 4px solid #667eea;
-        }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #667eea;
-        }
-        
-        .stat-label {
+            padding: 8px;
             font-size: 12px;
-            color: #888;
-            margin-top: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Axis Styling */
+        .axis text {
+            font-size: 10px;
+            color: #555;
         }
         
-        svg {
-            overflow: visible;
+        .axis path, .axis line {
+            display: none; /* Hide axis lines for cleaner look */
         }
-        
-        .grid-line {
-            stroke: #e0e0e0;
-            stroke-dasharray: 4;
-            opacity: 0.5;
+
+        /* Highlight effect for axis labels */
+        .axis text.active {
+            font-weight: bold;
+            fill: #d32f2f;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <header>
-            <h1>🎯 Attack Defense Performance Analysis System</h1>
-            <p class="subtitle">Interactive D3.js Data Visualization Dashboard</p>
-            <p class="description">Comprehensive analysis of 26 attack types across 9 defense methods with real-time interactions</p>
-        </header>
-        
-        <div class="controls-section">
-            <div class="control-group">
-                <label>📊 Chart Type:</label>
-                <button class="chart-btn active" data-chart="heatmap">Heatmap</button>
-                <button class="chart-btn" data-chart="barchart">Grouped Bar Chart</button>
-                <button class="chart-btn" data-chart="linechart">Line Chart</button>
-            </div>
-            <div class="control-group">
-                <button class="reset-btn" id="resetBtn">🔄 Reset All Filters</button>
-            </div>
-        </div>
-        
-        <div class="info-panel">
-            <strong>📈 Dataset Information:</strong> <span id="dataInfo">Displaying 26 attack types × 9 defense methods = 234 data points</span>
-        </div>
-        
-        <!-- Heatmap Chart -->
-        <div id="heatmapContainer" class="chart-wrapper active">
-            <div class="chart-title">🔥 Heatmap: Accuracy Distribution Across Attacks and Methods</div>
-            <div id="heatmap"></div>
-            <div class="legend">
-                <div class="legend-title">Legend:</div>
-                <div>🔴 Red (0%): Low accuracy | 🟡 Yellow (50%): Medium accuracy | 🟢 Green (100%): High accuracy</div>
-                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Hover over cells to see exact values</div>
-            </div>
-        </div>
-        
-        <!-- Bar Chart -->
-        <div id="barchartContainer" class="chart-wrapper">
-            <div class="chart-title">📊 Grouped Bar Chart: Method Comparison by Attack Type</div>
-            <div id="barchart"></div>
-            <div class="legend">
-                <div class="legend-title">Legend:</div>
-                <div>Each group represents an attack type, with bars showing accuracy for each defense method</div>
-                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Hover over bars to highlight and view details</div>
-            </div>
-        </div>
-        
-        <!-- Line Chart -->
-        <div id="linechartContainer" class="chart-wrapper">
-            <div class="chart-title">📈 Line Chart: Accuracy Trends by Defense Method</div>
-            <div id="linechart"></div>
-            <div class="legend">
-                <div class="legend-title">Legend:</div>
-                <div>Each line represents a defense method, showing how accuracy varies across different attacks</div>
-                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Click on legend items to toggle visibility, hover for details</div>
-            </div>
-        </div>
-        
-        <div class="stats-row">
-            <div class="stat-card">
-                <div class="stat-value" id="totalAttacks">26</div>
-                <div class="stat-label">Total Attack Types</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="totalMethods">9</div>
-                <div class="stat-label">Defense Methods</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avgAccuracy">0%</div>
-                <div class="stat-label">Average Accuracy</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="maxAccuracy">0%</div>
-                <div class="stat-label">Maximum Accuracy</div>
-            </div>
-        </div>
-    </div>
+
+    <h1>Model Robustness Under Various Attacks</h1>
+    <p>Data Option 2 Visualization: A heatmap comparing the performance scores of 9 approaches against 26 different attack types. Darker green indicates higher robustness (better performance), while red indicates vulnerability.</p>
     
+    <div id="chart-container"></div>
+    <div id="tooltip" class="tooltip"></div>
+
     <script>
-        // ==================== DATA DEFINITION ====================
+        // --- 1. DATA PREPARATION ---
+        // Transcribed from the user's image (Data Option 2: Lots of data)
         const rawData = [
-            { Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23 },
-            { Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80 },
-            { Attack: "MIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.90, TRADES: 51.90, MART: 50.50, RS: 5.80, IBP: 38.10, PRL: 0.00, TandT: 92.80 },
-            { Attack: "DIFGSM", ERM: 1.00, DA: 0.00, PGDT: 51.75, TRADES: 50.50, MART: 53.60, RS: 4.10, IBP: 38.10, PRL: 3.10, TandT: 92.80 },
-            { Attack: "VMIFGSM", ERM: 0.00, DA: 0.00, PGDT: 51.10, TRADES: 50.90, MART: 51.90, RS: 4.10, IBP: 38.10, PRL: 0.00, TandT: 93.90 },
-            { Attack: "TPGD", ERM: 38.10, DA: 39.20, PGDT: 69.30, TRADES: 69.10, MART: 70.10, RS: 48.50, IBP: 50.00, PRL: 28.90, TandT: 91.80 },
-            { Attack: "FGSM", ERM: 29.90, DA: 25.80, PGDT: 57.95, TRADES: 54.60, MART: 61.90, RS: 28.90, IBP: 38.10, PRL: 25.80, TandT: 93.80 },
-            { Attack: "RFGSM", ERM: 0.00, DA: 0.00, PGDT: 49.15, TRADES: 50.40, MART: 48.50, RS: 3.70, IBP: 38.10, PRL: 0.00, TandT: 90.00 },
-            { Attack: "BIM", ERM: 0.00, DA: 0.00, PGDT: 52.00, TRADES: 57.20, MART: 47.40, RS: 2.10, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
-            { Attack: "FAB", ERM: 1.00, DA: 2.10, PGDT: 43.00, TRADES: 46.40, MART: 40.20, RS: 5.30, IBP: 38.10, PRL: 4.10, TandT: 90.10 },
-            { Attack: "CW", ERM: 0.00, DA: 0.00, PGDT: 32.20, TRADES: 35.10, MART: 29.90, RS: 1.00, IBP: 40.20, PRL: 1.00, TandT: 92.90 },
-            { Attack: "UPGD", ERM: 0.00, DA: 0.00, PGDT: 49.85, TRADES: 50.50, MART: 49.80, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 93.80 },
-            { Attack: "FFGSM", ERM: 19.60, DA: 23.70, PGDT: 60.55, TRADES: 55.70, MART: 66.00, RS: 33.00, IBP: 42.30, PRL: 29.90, TandT: 92.80 },
-            { Attack: "Jitter", ERM: 11.30, DA: 12.40, PGDT: 48.15, TRADES: 47.40, MART: 49.50, RS: 34.00, IBP: 39.20, PRL: 24.70, TandT: 90.70 },
-            { Attack: "PGD", ERM: 0.00, DA: 0.00, PGDT: 57.40, TRADES: 54.60, MART: 60.80, RS: 7.20, IBP: 40.20, PRL: 0.00, TandT: 91.80 },
-            { Attack: "EOTPGD", ERM: 0.00, DA: 0.00, PGDT: 50.10, TRADES: 50.30, MART: 50.50, RS: 3.00, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
-            { Attack: "APGD", ERM: 0.00, DA: 0.00, PGDT: 48.40, TRADES: 51.00, MART: 46.40, RS: 1.00, IBP: 38.10, PRL: 0.00, TandT: 90.70 },
-            { Attack: "NIFGSM", ERM: 0.00, DA: 0.00, PGDT: 57.95, TRADES: 56.70, MART: 59.80, RS: 7.20, IBP: 38.10, PRL: 1.00, TandT: 92.80 },
-            { Attack: "SiniFCSM", ERM: 4.10, DA: 1.00, PGDT: 59.00, TRADES: 56.70, MART: 61.90, RS: 23.70, IBP: 38.10, PRL: 12.40, TandT: 93.70 },
-            { Attack: "VNIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.45, TRADES: 53.00, MART: 48.50, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 92.90 },
-            { Attack: "APGDT", ERM: 0.00, DA: 0.00, PGDT: 40.90, TRADES: 44.30, MART: 38.10, RS: 0.00, IBP: 38.10, PRL: 0.00, TandT: 88.70 },
-            { Attack: "Square", ERM: 0.00, DA: 1.00, PGDT: 50.40, TRADES: 54.00, MART: 47.40, RS: 3.10, IBP: 38.10, PRL: 2.10, TandT: 88.08 },
-            { Attack: "Add Gaussian Noise", ERM: 25.80, DA: 43.30, PGDT: 79.10, TRADES: 78.40, MART: 80.40, RS: 74.20, IBP: 42.30, PRL: 45.40, TandT: 87.60 },
-            { Attack: "OnePixel", ERM: 79.40, DA: 83.50, PGDT: 78.05, TRADES: 74.20, MART: 82.50, RS: 83.50, IBP: 42.50, PRL: 80.40, TandT: 89.70 },
-            { Attack: "Pixle", ERM: 0.00, DA: 0.00, PGDT: 12.55, TRADES: 11.30, MART: 14.40, RS: 1.00, IBP: 10.30, PRL: 0.00, TandT: 17.50 },
-            { Attack: "PGDL2", ERM: 1.00, DA: 0.00, PGDT: 35.80, TRADES: 36.10, MART: 36.10, RS: 5.20, IBP: 36.10, PRL: 0.00, TandT: 92.90 }
+            {Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23},
+            {Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80},
+            {Attack: "MIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.90, TRADES: 51.90, MART: 50.50, RS: 5.80, IBP: 38.10, PRL: 0.00, TandT: 92.80},
+            {Attack: "DIFGSM", ERM: 1.00, DA: 0.00, PGDT: 51.75, TRADES: 50.50, MART: 53.60, RS: 4.10, IBP: 38.10, PRL: 3.10, TandT: 92.80},
+            {Attack: "VMIFGSM", ERM: 0.00, DA: 0.00, PGDT: 51.10, TRADES: 50.90, MART: 51.90, RS: 4.10, IBP: 38.10, PRL: 0.00, TandT: 93.90},
+            {Attack: "TPGD", ERM: 38.10, DA: 39.20, PGDT: 69.30, TRADES: 69.10, MART: 70.10, RS: 48.50, IBP: 50.00, PRL: 28.90, TandT: 91.80},
+            {Attack: "FGSM", ERM: 29.90, DA: 25.80, PGDT: 57.95, TRADES: 54.60, MART: 61.90, RS: 28.90, IBP: 38.10, PRL: 25.80, TandT: 93.80},
+            {Attack: "RFGSM", ERM: 0.00, DA: 0.00, PGDT: 49.15, TRADES: 50.40, MART: 48.50, RS: 3.70, IBP: 38.10, PRL: 0.00, TandT: 90.00},
+            {Attack: "BIM", ERM: 0.00, DA: 0.00, PGDT: 52.00, TRADES: 57.20, MART: 47.40, RS: 2.10, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "FAB", ERM: 1.00, DA: 2.10, PGDT: 43.00, TRADES: 46.40, MART: 40.20, RS: 5.30, IBP: 38.10, PRL: 4.10, TandT: 90.10},
+            {Attack: "CW", ERM: 0.00, DA: 0.00, PGDT: 32.20, TRADES: 35.10, MART: 29.90, RS: 1.00, IBP: 40.20, PRL: 1.00, TandT: 92.90},
+            {Attack: "UPGD", ERM: 0.00, DA: 0.00, PGDT: 49.85, TRADES: 50.50, MART: 49.80, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 93.80},
+            {Attack: "FFGSM", ERM: 19.60, DA: 23.70, PGDT: 60.55, TRADES: 55.70, MART: 66.00, RS: 33.00, IBP: 42.30, PRL: 29.90, TandT: 92.80},
+            {Attack: "Jitter", ERM: 11.30, DA: 12.40, PGDT: 48.15, TRADES: 47.40, MART: 49.50, RS: 34.00, IBP: 39.20, PRL: 24.70, TandT: 90.70},
+            {Attack: "PGD", ERM: 0.00, DA: 0.00, PGDT: 57.40, TRADES: 54.60, MART: 60.80, RS: 7.20, IBP: 40.20, PRL: 0.00, TandT: 91.80},
+            {Attack: "EOTPGD", ERM: 0.00, DA: 0.00, PGDT: 50.10, TRADES: 50.30, MART: 50.50, RS: 3.00, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "APGD", ERM: 0.00, DA: 0.00, PGDT: 48.40, TRADES: 51.00, MART: 46.40, RS: 1.00, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "NIFGSM", ERM: 0.00, DA: 0.00, PGDT: 57.95, TRADES: 56.70, MART: 59.80, RS: 7.20, IBP: 38.10, PRL: 1.00, TandT: 92.80},
+            {Attack: "SiniFGSM", ERM: 4.10, DA: 1.00, PGDT: 59.00, TRADES: 56.70, MART: 61.90, RS: 23.70, IBP: 38.10, PRL: 12.40, TandT: 93.70},
+            {Attack: "VNIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.45, TRADES: 53.00, MART: 48.50, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 92.90},
+            {Attack: "APGDT", ERM: 0.00, DA: 0.00, PGDT: 40.90, TRADES: 44.30, MART: 38.10, RS: 0.00, IBP: 38.10, PRL: 0.00, TandT: 88.70},
+            {Attack: "Square", ERM: 0.00, DA: 1.00, PGDT: 50.40, TRADES: 54.00, MART: 47.40, RS: 3.10, IBP: 38.10, PRL: 2.10, TandT: 88.08},
+            {Attack: "Add G. Noise", ERM: 25.80, DA: 43.30, PGDT: 79.10, TRADES: 78.40, MART: 80.40, RS: 74.20, IBP: 42.30, PRL: 45.40, TandT: 87.60},
+            {Attack: "OnePixel", ERM: 79.40, DA: 83.50, PGDT: 78.05, TRADES: 74.20, MART: 82.50, RS: 83.50, IBP: 42.50, PRL: 80.40, TandT: 89.70},
+            {Attack: "Pixle", ERM: 0.00, DA: 0.00, PGDT: 12.55, TRADES: 11.30, MART: 14.40, RS: 1.00, IBP: 10.30, PRL: 0.00, TandT: 17.50},
+            {Attack: "PGDL2", ERM: 1.00, DA: 0.00, PGDT: 35.80, TRADES: 36.10, MART: 36.10, RS: 5.20, IBP: 36.10, PRL: 0.00, TandT: 92.90}
         ];
+
+        // Convert wide data to long format for D3
+        const approaches = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
+        const attacks = rawData.map(d => d.Attack);
         
-        const methods = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
-        let filteredData = JSON.parse(JSON.stringify(rawData));
-        
-        // ==================== TOOLTIP ====================
-        const tooltip = d3.select("body").append("div")
-            .attr("class", "tooltip")
-            .style("opacity", 0);
-        
-        // ==================== STATISTICS CALCULATION ====================
-        function updateStatistics() {
-            let allValues = [];
-            filteredData.forEach(d => {
-                methods.forEach(m => {
-                    allValues.push(d[m]);
+        let longData = [];
+        rawData.forEach(row => {
+            approaches.forEach(approach => {
+                longData.push({
+                    attack: row.Attack,
+                    approach: approach,
+                    value: row[approach]
                 });
             });
+        });
+
+        // --- 2. CHART SETUP ---
+        const margin = { top: 30, right: 30, bottom: 100, left: 100 };
+        const width = 800 - margin.left - margin.right;
+        const height = 700 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart-container")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // X Scale
+        const x = d3.scaleBand()
+            .range([0, width])
+            .domain(approaches)
+            .padding(0.05);
+
+        // Y Scale
+        const y = d3.scaleBand()
+            .range([0, height])
+            .domain(attacks)
+            .padding(0.05);
+
+        // Color Scale (Red to Green interpolation)
+        const myColor = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlGn)
+            .domain([0, 100]);
+
+        // --- 3. DRAWING AXES ---
+        // X Axis
+        svg.append("g")
+            .attr("transform", `translate(0, ${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("class", "x-label")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", "rotate(-45)");
+
+        // Y Axis
+        svg.append("g")
+            .call(d3.axisLeft(y))
+            .selectAll("text")
+            .attr("class", "y-label");
+
+        // Labels
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom - 10)
+            .attr("text-anchor", "middle")
+            .style("font-size", "14px")
+            .style("fill", "#333")
+            .text("Approaches (Models)");
+
+        svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left + 20)
+            .attr("x", 0 - (height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .style("font-size", "14px")
+            .style("fill", "#333")
+            .text("Attack Types");
+
+        // --- 4. INTERACTION & TOOLTIP ---
+        const tooltip = d3.select("#tooltip");
+
+        const mouseover = function(event, d) {
+            // Highlight cell
+            d3.select(this)
+                .style("stroke", "black")
+                .style("stroke-width", 2)
+                .style("opacity", 1);
             
-            const avgAccuracy = (allValues.reduce((a, b) => a + b, 0) / allValues.length).toFixed(2);
-            const maxAccuracy = Math.max(...allValues).toFixed(2);
-            
-            document.getElementById("avgAccuracy").textContent = avgAccuracy + "%";
-            document.getElementById("maxAccuracy").textContent = maxAccuracy + "%";
+            // Show Tooltip
+            tooltip
+                .style("opacity", 1)
+                .html(`
+                    <strong>Attack:</strong> ${d.attack}<br>
+                    <strong>Model:</strong> ${d.approach}<br>
+                    <strong>Score:</strong> <span style='color:${myColor(d.value)}'>${d.value}%</span>
+                `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
+
+            // Highlight Axis Labels
+            svg.selectAll(".x-label").filter(t => t === d.approach).classed("active", true);
+            svg.selectAll(".y-label").filter(t => t === d.attack).classed("active", true);
         }
-        
-        // ==================== HEATMAP CHART ====================
-        function drawHeatmap() {
-            const margin = { top: 60, right: 60, bottom: 200, left: 150 };
-            const width = 1400 - margin.left - margin.right;
-            const height = 700 - margin.top - margin.bottom;
-            
-            d3.select("#heatmap").html("");
-            
-            const svg = d3.select("#heatmap").append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-            
-            // Transform data
-            const heatmapData = [];
-            filteredData.forEach(d => {
-                methods.forEach(method => {
-                    heatmapData.push({
-                        attack: d.Attack,
-                        method: method,
-                        value: d[method]
-                    });
-                });
-            });
-            
-            // Scales
-            const xScale = d3.scaleBand()
-                .domain(methods)
-                .range([0, width])
-                .padding(0.05);
-            
-            const yScale = d3.scaleBand()
-                .domain(filteredData.map(d => d.Attack))
-                .range([0, height])
-                .padding(0.05);
-            
-            const colorScale = d3.scaleLinear()
-                .domain([0, 50, 100])
-                .range(["#d73027", "#fee090", "#1a9850"]);
-            
-            // Draw cells with transition
-            svg.selectAll("rect")
-                .data(heatmapData)
-                .enter()
-                .append("rect")
-                .attr("x", d => xScale(d.method))
-                .attr("y", d => yScale(d.attack))
-                .attr("width", xScale.bandwidth())
-                .attr("height", yScale.bandwidth())
-                .attr("fill", "#f0f0f0")
-                .transition()
-                .duration(1200)
-                .ease(d3.easeQuadInOut)
-                .attr("fill", d => colorScale(d.value));
-            
-            // Interactions
-            svg.selectAll("rect")
-                .on("mouseover", function(event, d) {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("stroke", "#333")
-                        .attr("stroke-width", 3);
-                    
-                    tooltip.transition()
-                        .duration(150)
-                        .style("opacity", 1);
-                    
-                    tooltip.html(`
-                        <strong>${d.method}</strong><br/>
-                        Attack: ${d.attack}<br/>
-                        Accuracy: <strong>${d.value.toFixed(2)}%</strong>
-                    `)
-                        .style("left", (event.pageX + 15) + "px")
-                        .style("top", (event.pageY - 35) + "px");
-                })
-                .on("mouseout", function() {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("stroke", "none");
-                    
-                    tooltip.transition()
-                        .duration(150)
-                        .style("opacity", 0);
-                });
-            
-            // X Axis
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(xScale))
-                .selectAll("text")
-                .attr("transform", "rotate(45)")
-                .attr("text-anchor", "start")
-                .attr("class", "axis-label");
-            
-            // Y Axis
-            svg.append("g")
-                .call(d3.axisLeft(yScale))
-                .selectAll("text")
-                .attr("class", "axis-label");
-            
-            // Legend
-            const legendWidth = 300;
-            const legendX = width + 20;
-            const legendGroup = svg.append("g")
-                .attr("transform", `translate(${legendX}, 0)`);
-            
-            const legendScale = d3.scaleLinear()
-                .domain([0, 100])
-                .range([0, legendWidth]);
-            
-            const legendAxis = d3.axisBottom(legendScale)
-                .ticks(5)
-                .tickFormat(d => d + "%");
-            
-            legendGroup.append("defs").append("linearGradient")
-                .attr("id", "legend-gradient")
-                .attr("x1", "0%").attr("x2", "100%")
-                .selectAll("stop")
-                .data(d3.range(0, 101, 1))
-                .enter()
-                .append("stop")
-                .attr("offset", d => d + "%")
-                .attr("stop-color", d => colorScale(d));
-            
-            legendGroup.append("rect")
-                .attr("width", legendWidth)
-                .attr("height", 20)
-                .attr("fill", "url(#legend-gradient)");
-            
-            legendGroup.append("g")
-                .attr("transform", `translate(0,20)`)
-                .call(legendAxis)
-                .attr("class", "axis-label");
+
+        const mousemove = function(event, d) {
+            tooltip
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
         }
+
+        const mouseleave = function(event, d) {
+            // Remove highlight
+            d3.select(this)
+                .style("stroke", "none")
+                .style("stroke-width", 0)
+                .style("opacity", 0.9); // Return to default slightly transparent opacity if desired
+            
+            tooltip.style("opacity", 0);
+
+            // Remove Axis Highlight
+            svg.selectAll(".x-label").classed("active", false);
+            svg.selectAll(".y-label").classed("active", false);
+        }
+
+        // --- 5. RENDERING WITH TRANSITION ---
         
-        // ==================== BAR CHART ====================
-        function drawBarchart() {
-            const margin = { top: 60, right: 40, bottom: 200, left: 80 };
-            const width = 1400 - margin.left - margin.right;
-            const height = 700 - margin.top - margin.bottom;
-            
-            d3.select("#barchart").html("");
-            
-            const svg = d3.select("#barchart").append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-            
-            // Scales
-            const xScale = d3.scaleBand()
-                .domain(filteredData.map(d => d.Attack))
-                .range([0, width])
-                .padding(0.1);
-            
-            const subXScale = d3.scaleBand()
-                .domain(methods)
-                .range([0, xScale.bandwidth()])
-                .padding(0.05);
-            
-            const yScale = d3.scaleLinear()
-                .domain([0, 100])
-                .range([height, 0]);
-            
-            const colorScale = d3.scaleOrdinal()
-                .domain(methods)
-                .range(d3.schemeSet2);
-            
-            // Grid lines
-            svg.append("g")
-                .attr("class", "grid-line")
-                .call(d3.axisLeft(yScale)
-                    .tickSize(-width)
-                    .tickFormat("")
-                );
-            
-            // Draw bars
-            svg.selectAll("g.attack")
-                .data(filteredData)
-                .enter()
-                .append("g")
-                .attr("class", "attack")
-                .attr("transform", d => `translate(${xScale(d.Attack)},0)`)
-                .selectAll("rect")
-                .data(d => methods.map(method => ({ method, value: d[method], attack: d.Attack })))
-                .enter()
-                .append("rect")
-                .attr("x", d => subXScale(d.method))
-                .attr("y", height)
-                .attr("width", subXScale.bandwidth())
-                .attr("height", 0)
-                .attr("fill", d => colorScale(d.method))
-                .transition()
-                .duration(1000)
-                .delay((d, i) => i * 30)
-                .ease(d3.easeBackOut)
-                .attr("y", d => yScale(d.value))
-                .attr("height", d => height - yScale(d.value));
-            
-            // Interactions
-            svg.selectAll("rect")
-                .on("mouseover", function(event, d) {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("opacity", 0.7)
-                        .attr("stroke", "#333")
-                        .attr("stroke-width", 2);
-                    
-                    tooltip.transition()
-                        .duration(150)
-                        .style("opacity", 1);
-                    
-                    tooltip.html(`
-                        <strong>${d.method}</strong><br/>
-                        Attack: ${d.attack}<br/>
-                        Accuracy: <strong>${d.value.toFixed(2)}%</strong>
-                    `)
-                        .style("left", (event.pageX + 15) + "px")
-                        .style("top", (event.pageY - 35) + "px");
-                })
-                .on("mouseout", function() {
-                    d3.select(this)
-                        .transition()
-                        .duration(150)
-                        .attr("opacity", 1)
-                        .attr("stroke", "none");
-                    
-                    tooltip.transition()
-                        .duration(150)
-                        .style("opacity", 0);
-                });
-            
-            // X Axis
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(xScale))
-                .selectAll("text")
-                .attr("transform", "rotate(45)")
-                .attr("text-anchor", "start")
-                .attr("class", "axis-label");
-            
-            // Y Axis
-            svg.append("g")
-                .call(d3.axisLeft(yScale))
-                .append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .attr("class", "axis-title")
-                .text("Accuracy (%)");
-            
-            // Legend
-            const legend = svg.append("g")
-                .attr("transform", `translate(${width - 200}, -
+        const rects = svg.selectAll()
+            .data(longData)
+            .enter()
+            .append("rect")
+            .attr("x", d => x(d.approach))
+            .attr("y", d => y(d.attack))
+            .attr("width", x.bandwidth())
+            .attr("height", y.bandwidth())
+            .style("fill", d => myColor(d.value))
+            .style("opacity", 0) // Start invisible for transition
+            .on("mouseover", mouseover)
+            .on("mousemove", mousemove)
+            .on("mouseleave", mouseleave);
+
+        // Transition: Fade in wave effect (Requirement: non-interaction triggered transition)
+        rects.transition()
+            .duration(800)
+            .delay((d, i) => i * 2) // Slight delay for each cell creates a filling effect
+            .style("opacity", 0.9);
+
+        // --- 6. LEGEND ---
+        const legendHeight = 300;
+        const legendWidth = 20;
+        
+        // Create gradient for legend
+        const defs = svg.append("defs");
+        const linearGradient = defs.append("linearGradient")
+            .attr("id", "linear-gradient");
+
+        linearGradient
+            .attr("x1", "0%")
+            .attr("y1", "100%") // Bottom
+            .attr("x2", "0%")
+            .attr("y2", "0%"); // Top
+
+        linearGradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", myColor(0));
+        
+        linearGradient.append("stop")
+            .attr("offset", "50%")
+            .attr("stop-color", myColor(50));
+
+        linearGradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", myColor(100));
+
+        // Legend Container
+        const legend = svg.append("g")
+            .attr("transform", `translate(${width + 40}, ${height/2 - legendHeight/2})`);
+
+        legend.append("rect")
+            .attr("width", legendWidth)
+            .attr("height", legendHeight)
+            .style("fill", "url(#linear-gradient)");
+
+        // Legend scale
+        const yLegend = d3.scaleLinear()
+            .range([legendHeight, 0])
+            .domain([0, 100]);
+
+        const legendAxis = d3.axisRight(yLegend).ticks(5);
+
+        legend.append("g")
+            .attr("transform", `translate(${legendWidth}, 0)`)
+            .call(legendAxis);
+        
+        legend.append("text")
+            .attr("x", 0)
+            .attr("y", -10)
+            .text("Score")
+            .style("font-size", "12px");
+
+    </script>
+</body>
+</html>
+```
