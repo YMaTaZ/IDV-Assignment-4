@@ -1,15 +1,14 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDV Assignment 4: Robustness Visualization</title>
+    <title>IDV Assignment 4: Advanced Robustness Visualization</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f9;
+            background-color: #f8f9fa;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -17,16 +16,47 @@
             padding: 20px;
         }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        h3 { color: #7f8c8d; margin-top: 0; font-weight: 400; }
+        
+        .controls {
+            background: #ffffff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
-        p {
-            color: #666;
-            max-width: 800px;
-            text-align: center;
-            margin-bottom: 30px;
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+            font-size: 14px;
+        }
+
+        button:hover { background-color: #2980b9; }
+        button:active { transform: scale(0.98); }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        input[type=range] {
+            width: 150px;
+            cursor: pointer;
         }
 
         #chart-container {
@@ -34,52 +64,61 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             border-radius: 8px;
             padding: 20px;
+            position: relative;
         }
 
-        /* Tooltip Styling */
         .tooltip {
             position: absolute;
             text-align: center;
-            padding: 8px;
-            font-size: 12px;
-            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            font-size: 13px;
+            background: rgba(30, 30, 30, 0.9);
             color: #fff;
-            border-radius: 4px;
+            border-radius: 5px;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.2s;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
         }
 
-        /* Axis Styling */
-        .axis text {
-            font-size: 10px;
-            color: #555;
-        }
+        .axis text { font-size: 11px; fill: #555; }
+        .axis path, .axis line { display: none; }
         
-        .axis path, .axis line {
-            display: none; /* Hide axis lines for cleaner look */
-        }
-
-        /* Highlight effect for axis labels */
+        /* Highlight classes */
         .axis text.active {
             font-weight: bold;
             fill: #d32f2f;
-            font-size: 12px;
+            font-size: 13px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Model Robustness Under Various Attacks</h1>
-    <p>Data Option 2 Visualization: A heatmap comparing the performance scores of 9 approaches against 26 different attack types. Darker green indicates higher robustness (better performance), while red indicates vulnerability.</p>
+    <h1>Model Robustness Heatmap</h1>
+    <h3>Data Option 2: Performance of 9 Approaches vs 26 Attacks</h3>
+
+    <div class="controls">
+        <!-- Sorting Buttons -->
+        <div>
+            <span style="font-weight:bold; margin-right:5px;">Sort:</span>
+            <button onclick="sortOriginal()">Original Order</button>
+            <button onclick="sortByModelPerformance()">Best Models First</button>
+            <button onclick="sortByAttackDifficulty()">Hardest Attacks First</button>
+        </div>
+
+        <!-- Filtering Slider -->
+        <div class="slider-container">
+            <span style="font-weight:bold;">Filter Score < <span id="slider-val">0</span>:</span>
+            <input type="range" id="filterSlider" min="0" max="100" value="0" step="1">
+        </div>
+    </div>
     
     <div id="chart-container"></div>
     <div id="tooltip" class="tooltip"></div>
 
     <script>
-        // --- 1. DATA PREPARATION ---
-        // Transcribed from the user's image (Data Option 2: Lots of data)
+        // --- 1. DATA PROCESSING ---
         const rawData = [
             {Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23},
             {Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80},
@@ -109,10 +148,21 @@
             {Attack: "PGDL2", ERM: 1.00, DA: 0.00, PGDT: 35.80, TRADES: 36.10, MART: 36.10, RS: 5.20, IBP: 36.10, PRL: 0.00, TandT: 92.90}
         ];
 
-        // Convert wide data to long format for D3
         const approaches = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
-        const attacks = rawData.map(d => d.Attack);
+        const attacksOriginal = rawData.map(d => d.Attack);
         
+        // Calculate averages for sorting
+        const modelAverages = approaches.map(model => {
+            const sum = rawData.reduce((acc, curr) => acc + curr[model], 0);
+            return { model: model, avg: sum / rawData.length };
+        });
+
+        const attackAverages = rawData.map(row => {
+            let sum = 0;
+            approaches.forEach(a => sum += row[a]);
+            return { attack: row.Attack, avg: sum / approaches.length };
+        });
+
         let longData = [];
         rawData.forEach(row => {
             approaches.forEach(approach => {
@@ -124,9 +174,9 @@
             });
         });
 
-        // --- 2. CHART SETUP ---
-        const margin = { top: 30, right: 30, bottom: 100, left: 100 };
-        const width = 800 - margin.left - margin.right;
+        // --- 2. D3 SETUP ---
+        const margin = { top: 40, right: 50, bottom: 100, left: 120 };
+        const width = 850 - margin.left - margin.right;
         const height = 700 - margin.top - margin.bottom;
 
         const svg = d3.select("#chart-container")
@@ -136,110 +186,75 @@
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // X Scale
-        const x = d3.scaleBand()
-            .range([0, width])
-            .domain(approaches)
-            .padding(0.05);
+        // Scales
+        const x = d3.scaleBand().range([0, width]).domain(approaches).padding(0.05);
+        const y = d3.scaleBand().range([0, height]).domain(attacksOriginal).padding(0.05);
+        const myColor = d3.scaleSequential().interpolator(d3.interpolateRdYlGn).domain([0, 100]);
 
-        // Y Scale
-        const y = d3.scaleBand()
-            .range([0, height])
-            .domain(attacks)
-            .padding(0.05);
+        // Axes
+        const xAxisGroup = svg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", `translate(0, ${height})`);
+        
+        const yAxisGroup = svg.append("g")
+            .attr("class", "y-axis");
 
-        // Color Scale (Red to Green interpolation)
-        const myColor = d3.scaleSequential()
-            .interpolator(d3.interpolateRdYlGn)
-            .domain([0, 100]);
+        function drawAxes() {
+            xAxisGroup.call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("class", "x-label")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-45)");
 
-        // --- 3. DRAWING AXES ---
-        // X Axis
-        svg.append("g")
-            .attr("transform", `translate(0, ${height})`)
-            .call(d3.axisBottom(x))
-            .selectAll("text")
-            .attr("class", "x-label")
-            .style("text-anchor", "end")
-            .attr("dx", "-.8em")
-            .attr("dy", ".15em")
-            .attr("transform", "rotate(-45)");
+            yAxisGroup.call(d3.axisLeft(y))
+                .selectAll("text")
+                .attr("class", "y-label");
+        }
+        drawAxes();
 
-        // Y Axis
-        svg.append("g")
-            .call(d3.axisLeft(y))
-            .selectAll("text")
-            .attr("class", "y-label");
+        // Axis Labels
+        svg.append("text").attr("x", width / 2).attr("y", height + margin.bottom - 10).attr("text-anchor", "middle")
+           .style("font-weight", "bold").text("Defense Approaches (Models)");
 
-        // Labels
-        svg.append("text")
-            .attr("x", width / 2)
-            .attr("y", height + margin.bottom - 10)
-            .attr("text-anchor", "middle")
-            .style("font-size", "14px")
-            .style("fill", "#333")
-            .text("Approaches (Models)");
+        svg.append("text").attr("transform", "rotate(-90)").attr("y", -margin.left + 20).attr("x", -height / 2)
+           .attr("dy", "1em").attr("text-anchor", "middle").style("font-weight", "bold").text("Attack Methods");
 
-        svg.append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 0 - margin.left + 20)
-            .attr("x", 0 - (height / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .style("font-size", "14px")
-            .style("fill", "#333")
-            .text("Attack Types");
-
-        // --- 4. INTERACTION & TOOLTIP ---
+        // --- 3. TOOLTIP & MOUSE EVENTS ---
         const tooltip = d3.select("#tooltip");
 
         const mouseover = function(event, d) {
-            // Highlight cell
-            d3.select(this)
-                .style("stroke", "black")
-                .style("stroke-width", 2)
-                .style("opacity", 1);
+            if (d3.select(this).style("opacity") < 0.5) return; // Don't highlight filtered items
+
+            d3.select(this).style("stroke", "#222").style("stroke-width", 2).raise();
             
-            // Show Tooltip
-            tooltip
-                .style("opacity", 1)
+            tooltip.style("opacity", 1)
                 .html(`
-                    <strong>Attack:</strong> ${d.attack}<br>
-                    <strong>Model:</strong> ${d.approach}<br>
-                    <strong>Score:</strong> <span style='color:${myColor(d.value)}'>${d.value}%</span>
+                    <div style="margin-bottom:5px;"><strong>${d.approach}</strong> vs <strong>${d.attack}</strong></div>
+                    <div style="font-size:16px;">Score: <span style='color:${myColor(d.value)}; font-weight:bold;'>${d.value.toFixed(2)}</span></div>
                 `)
                 .style("left", (event.pageX + 15) + "px")
                 .style("top", (event.pageY - 15) + "px");
 
-            // Highlight Axis Labels
+            // Highlight labels
             svg.selectAll(".x-label").filter(t => t === d.approach).classed("active", true);
             svg.selectAll(".y-label").filter(t => t === d.attack).classed("active", true);
         }
 
-        const mousemove = function(event, d) {
-            tooltip
-                .style("left", (event.pageX + 15) + "px")
-                .style("top", (event.pageY - 15) + "px");
+        const mousemove = function(event) {
+            tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 15) + "px");
         }
 
-        const mouseleave = function(event, d) {
-            // Remove highlight
-            d3.select(this)
-                .style("stroke", "none")
-                .style("stroke-width", 0)
-                .style("opacity", 0.9); // Return to default slightly transparent opacity if desired
-            
+        const mouseleave = function() {
+            d3.select(this).style("stroke", "none");
             tooltip.style("opacity", 0);
-
-            // Remove Axis Highlight
-            svg.selectAll(".x-label").classed("active", false);
-            svg.selectAll(".y-label").classed("active", false);
+            svg.selectAll(".x-label, .y-label").classed("active", false);
         }
 
-        // --- 5. RENDERING WITH TRANSITION ---
-        
+        // --- 4. DRAW HEATMAP ---
         const rects = svg.selectAll()
-            .data(longData)
+            .data(longData, d => d.approach + ':' + d.attack)
             .enter()
             .append("rect")
             .attr("x", d => x(d.approach))
@@ -247,71 +262,93 @@
             .attr("width", x.bandwidth())
             .attr("height", y.bandwidth())
             .style("fill", d => myColor(d.value))
-            .style("opacity", 0) // Start invisible for transition
+            .style("opacity", 0) // Start hidden for intro animation
             .on("mouseover", mouseover)
             .on("mousemove", mousemove)
             .on("mouseleave", mouseleave);
 
-        // Transition: Fade in wave effect (Requirement: non-interaction triggered transition)
-        rects.transition()
-            .duration(800)
-            .delay((d, i) => i * 2) // Slight delay for each cell creates a filling effect
-            .style("opacity", 0.9);
+        // Intro Animation
+        rects.transition().duration(1000)
+            .delay((d, i) => i * 2)
+            .style("opacity", 1);
 
-        // --- 6. LEGEND ---
+        // --- 5. LEGEND ---
         const legendHeight = 300;
-        const legendWidth = 20;
-        
-        // Create gradient for legend
+        const legendWidth = 15;
         const defs = svg.append("defs");
-        const linearGradient = defs.append("linearGradient")
-            .attr("id", "linear-gradient");
+        const linearGradient = defs.append("linearGradient").attr("id", "linear-gradient");
+        linearGradient.attr("x1", "0%").attr("y1", "100%").attr("x2", "0%").attr("y2", "0%");
+        linearGradient.append("stop").attr("offset", "0%").attr("stop-color", myColor(0));
+        linearGradient.append("stop").attr("offset", "50%").attr("stop-color", myColor(50));
+        linearGradient.append("stop").attr("offset", "100%").attr("stop-color", myColor(100));
 
-        linearGradient
-            .attr("x1", "0%")
-            .attr("y1", "100%") // Bottom
-            .attr("x2", "0%")
-            .attr("y2", "0%"); // Top
-
-        linearGradient.append("stop")
-            .attr("offset", "0%")
-            .attr("stop-color", myColor(0));
+        const legend = svg.append("g").attr("transform", `translate(${width + 20}, ${height/2 - legendHeight/2})`);
+        legend.append("rect").attr("width", legendWidth).attr("height", legendHeight).style("fill", "url(#linear-gradient)");
         
-        linearGradient.append("stop")
-            .attr("offset", "50%")
-            .attr("stop-color", myColor(50));
+        const yLegend = d3.scaleLinear().range([legendHeight, 0]).domain([0, 100]);
+        legend.append("g").attr("transform", `translate(${legendWidth}, 0)`).call(d3.axisRight(yLegend).ticks(5));
+        legend.append("text").attr("x", 0).attr("y", -10).text("Score").style("font-size", "12px");
 
-        linearGradient.append("stop")
-            .attr("offset", "100%")
-            .attr("stop-color", myColor(100));
+        // --- 6. INTERACTION LOGIC ---
 
-        // Legend Container
-        const legend = svg.append("g")
-            .attr("transform", `translate(${width + 40}, ${height/2 - legendHeight/2})`);
+        // Sorting Functions
+        function sortOriginal() {
+            updateSort(approaches, attacksOriginal);
+        }
 
-        legend.append("rect")
-            .attr("width", legendWidth)
-            .attr("height", legendHeight)
-            .style("fill", "url(#linear-gradient)");
+        function sortByModelPerformance() {
+            // Sort models by high avg to low avg
+            const sortedModels = [...modelAverages].sort((a, b) => b.avg - a.avg).map(d => d.model);
+            updateSort(sortedModels, null); // Keep current Y order
+        }
 
-        // Legend scale
-        const yLegend = d3.scaleLinear()
-            .range([legendHeight, 0])
-            .domain([0, 100]);
+        function sortByAttackDifficulty() {
+            // Sort attacks by low avg (hardest) to high avg (easiest)
+            // Or sort by high avg (easy) to low avg (hard). Let's do Hardest (Low score) at top.
+            const sortedAttacks = [...attackAverages].sort((a, b) => a.avg - b.avg).map(d => d.attack);
+            updateSort(null, sortedAttacks); // Keep current X order
+        }
 
-        const legendAxis = d3.axisRight(yLegend).ticks(5);
+        function updateSort(newXDomain, newYDomain) {
+            const t = svg.transition().duration(1000);
 
-        legend.append("g")
-            .attr("transform", `translate(${legendWidth}, 0)`)
-            .call(legendAxis);
-        
-        legend.append("text")
-            .attr("x", 0)
-            .attr("y", -10)
-            .text("Score")
-            .style("font-size", "12px");
+            if (newXDomain) x.domain(newXDomain);
+            if (newYDomain) y.domain(newYDomain);
+
+            // Move Rects
+            svg.selectAll("rect")
+                .transition(t)
+                .attr("x", d => x(d.approach))
+                .attr("y", d => y(d.attack));
+
+            // Update Axes
+            if (newXDomain) {
+                xAxisGroup.transition(t).call(d3.axisBottom(x))
+                    .selectAll("text")
+                    .attr("class", "x-label")
+                    .style("text-anchor", "end")
+                    .attr("dx", "-.8em")
+                    .attr("dy", ".15em")
+                    .attr("transform", "rotate(-45)");
+            }
+            if (newYDomain) {
+                yAxisGroup.transition(t).call(d3.axisLeft(y))
+                    .selectAll("text")
+                    .attr("class", "y-label");
+            }
+        }
+
+        // Filtering Logic
+        d3.select("#filterSlider").on("input", function() {
+            const val = +this.value;
+            d3.select("#slider-val").text(val);
+
+            svg.selectAll("rect")
+                .transition().duration(200)
+                .style("opacity", d => d.value < val ? 0.1 : 1)
+                .style("filter", d => d.value < val ? "grayscale(100%)" : "none");
+        });
 
     </script>
 </body>
 </html>
-
