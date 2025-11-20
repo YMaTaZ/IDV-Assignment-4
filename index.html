@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDV Assignment 4: Advanced Robustness Visualization</title>
+    <title>IDV Assignment 4: Interactive Heatmap</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
@@ -26,25 +26,28 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             margin-bottom: 20px;
             display: flex;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
             flex-wrap: wrap;
             justify-content: center;
         }
 
+        /* Button Styling */
         button {
             background-color: #3498db;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 10px 20px;
+            border-radius: 5px;
             cursor: pointer;
-            transition: background 0.3s, transform 0.1s;
+            transition: all 0.2s ease;
             font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        button:hover { background-color: #2980b9; }
-        button:active { transform: scale(0.98); }
+        button:hover { background-color: #2980b9; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+        button:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         
         .slider-container {
             display: flex;
@@ -52,12 +55,12 @@
             gap: 10px;
             font-size: 14px;
             color: #555;
+            background: #eee;
+            padding: 5px 15px;
+            border-radius: 20px;
         }
 
-        input[type=range] {
-            width: 150px;
-            cursor: pointer;
-        }
+        input[type=range] { width: 120px; cursor: pointer; }
 
         #chart-container {
             background: white;
@@ -77,9 +80,9 @@
             border-radius: 5px;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.1s;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 10;
+            z-index: 100;
         }
 
         .axis text { font-size: 11px; fill: #555; }
@@ -99,17 +102,14 @@
     <h3>Data Option 2: Performance of 9 Approaches vs 26 Attacks</h3>
 
     <div class="controls">
-        <!-- Sorting Buttons -->
-        <div>
-            <span style="font-weight:bold; margin-right:5px;">Sort:</span>
-            <button onclick="sortOriginal()">Original Order</button>
-            <button onclick="sortByModelPerformance()">Best Models First</button>
-            <button onclick="sortByAttackDifficulty()">Hardest Attacks First</button>
-        </div>
+        <!-- Note: Removed onclick attributes, using IDs instead -->
+        <span style="font-weight:bold;">Sort By:</span>
+        <button id="btn-orig">Default Order</button>
+        <button id="btn-best-model">Best Models (Cols)</button>
+        <button id="btn-hard-attack">Hardest Attacks (Rows)</button>
 
-        <!-- Filtering Slider -->
         <div class="slider-container">
-            <span style="font-weight:bold;">Filter Score < <span id="slider-val">0</span>:</span>
+            <span>Min Score: <strong id="slider-val">0</strong></span>
             <input type="range" id="filterSlider" min="0" max="100" value="0" step="1">
         </div>
     </div>
@@ -118,7 +118,7 @@
     <div id="tooltip" class="tooltip"></div>
 
     <script>
-        // --- 1. DATA PROCESSING ---
+        // --- 1. DATA PREPARATION ---
         const rawData = [
             {Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23},
             {Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80},
@@ -151,16 +151,18 @@
         const approaches = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
         const attacksOriginal = rawData.map(d => d.Attack);
         
-        // Calculate averages for sorting
-        const modelAverages = approaches.map(model => {
-            const sum = rawData.reduce((acc, curr) => acc + curr[model], 0);
-            return { model: model, avg: sum / rawData.length };
-        });
+        // Calculate stats for sorting
+        const modelStats = approaches.map(m => ({
+            name: m,
+            avg: d3.mean(rawData, d => d[m])
+        }));
 
-        const attackAverages = rawData.map(row => {
-            let sum = 0;
-            approaches.forEach(a => sum += row[a]);
-            return { attack: row.Attack, avg: sum / approaches.length };
+        const attackStats = rawData.map(d => {
+            const vals = approaches.map(a => d[a]);
+            return {
+                name: d.Attack,
+                avg: d3.mean(vals)
+            };
         });
 
         let longData = [];
@@ -175,7 +177,7 @@
         });
 
         // --- 2. D3 SETUP ---
-        const margin = { top: 40, right: 50, bottom: 100, left: 120 };
+        const margin = { top: 40, right: 60, bottom: 100, left: 120 };
         const width = 850 - margin.left - margin.right;
         const height = 700 - margin.top - margin.bottom;
 
@@ -187,74 +189,62 @@
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         // Scales
-        const x = d3.scaleBand().range([0, width]).domain(approaches).padding(0.05);
-        const y = d3.scaleBand().range([0, height]).domain(attacksOriginal).padding(0.05);
-        const myColor = d3.scaleSequential().interpolator(d3.interpolateRdYlGn).domain([0, 100]);
+        const x = d3.scaleBand()
+            .range([0, width])
+            .domain(approaches)
+            .padding(0.05);
 
-        // Axes
+        const y = d3.scaleBand()
+            .range([0, height])
+            .domain(attacksOriginal)
+            .padding(0.05);
+
+        const myColor = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlGn)
+            .domain([0, 100]);
+
+        // Axes Groups
         const xAxisGroup = svg.append("g")
             .attr("class", "x-axis")
             .attr("transform", `translate(0, ${height})`);
-        
+
         const yAxisGroup = svg.append("g")
             .attr("class", "y-axis");
 
-        function drawAxes() {
-            xAxisGroup.call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("class", "x-label")
-                .style("text-anchor", "end")
-                .attr("dx", "-.8em")
-                .attr("dy", ".15em")
-                .attr("transform", "rotate(-45)");
+        // Function to render/update axes
+        function renderAxes(transition) {
+            let xG = transition ? xAxisGroup.transition(transition) : xAxisGroup;
+            let yG = transition ? yAxisGroup.transition(transition) : yAxisGroup;
 
-            yAxisGroup.call(d3.axisLeft(y))
-                .selectAll("text")
-                .attr("class", "y-label");
+            xG.call(d3.axisBottom(x))
+              .selectAll("text")
+              .attr("class", "x-label")
+              .style("text-anchor", "end")
+              .attr("dx", "-.8em")
+              .attr("dy", ".15em")
+              .attr("transform", "rotate(-45)");
+
+            yG.call(d3.axisLeft(y))
+              .selectAll("text")
+              .attr("class", "y-label");
         }
-        drawAxes();
 
-        // Axis Labels
-        svg.append("text").attr("x", width / 2).attr("y", height + margin.bottom - 10).attr("text-anchor", "middle")
-           .style("font-weight", "bold").text("Defense Approaches (Models)");
+        // Initial Axis Render
+        renderAxes();
+
+        // Labels
+        svg.append("text").attr("x", width / 2).attr("y", height + margin.bottom - 10)
+           .attr("text-anchor", "middle").style("font-weight", "bold").text("Defense Approaches (Models)");
 
         svg.append("text").attr("transform", "rotate(-90)").attr("y", -margin.left + 20).attr("x", -height / 2)
            .attr("dy", "1em").attr("text-anchor", "middle").style("font-weight", "bold").text("Attack Methods");
 
-        // --- 3. TOOLTIP & MOUSE EVENTS ---
-        const tooltip = d3.select("#tooltip");
+        // --- 3. DRAW HEATMAP ---
+        // Use a group for rects to manage z-index if needed
+        const rectGroup = svg.append("g").attr("class", "rects");
 
-        const mouseover = function(event, d) {
-            if (d3.select(this).style("opacity") < 0.5) return; // Don't highlight filtered items
-
-            d3.select(this).style("stroke", "#222").style("stroke-width", 2).raise();
-            
-            tooltip.style("opacity", 1)
-                .html(`
-                    <div style="margin-bottom:5px;"><strong>${d.approach}</strong> vs <strong>${d.attack}</strong></div>
-                    <div style="font-size:16px;">Score: <span style='color:${myColor(d.value)}; font-weight:bold;'>${d.value.toFixed(2)}</span></div>
-                `)
-                .style("left", (event.pageX + 15) + "px")
-                .style("top", (event.pageY - 15) + "px");
-
-            // Highlight labels
-            svg.selectAll(".x-label").filter(t => t === d.approach).classed("active", true);
-            svg.selectAll(".y-label").filter(t => t === d.attack).classed("active", true);
-        }
-
-        const mousemove = function(event) {
-            tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 15) + "px");
-        }
-
-        const mouseleave = function() {
-            d3.select(this).style("stroke", "none");
-            tooltip.style("opacity", 0);
-            svg.selectAll(".x-label, .y-label").classed("active", false);
-        }
-
-        // --- 4. DRAW HEATMAP ---
-        const rects = svg.selectAll()
-            .data(longData, d => d.approach + ':' + d.attack)
+        const rects = rectGroup.selectAll("rect")
+            .data(longData, d => d.approach + "-" + d.attack)
             .enter()
             .append("rect")
             .attr("x", d => x(d.approach))
@@ -262,92 +252,116 @@
             .attr("width", x.bandwidth())
             .attr("height", y.bandwidth())
             .style("fill", d => myColor(d.value))
-            .style("opacity", 0) // Start hidden for intro animation
-            .on("mouseover", mouseover)
-            .on("mousemove", mousemove)
-            .on("mouseleave", mouseleave);
+            .style("opacity", 0); // Start hidden
 
-        // Intro Animation
+        // Intro Transition
         rects.transition().duration(1000)
-            .delay((d, i) => i * 2)
+            .delay((d, i) => i * 1.5)
             .style("opacity", 1);
 
-        // --- 5. LEGEND ---
+        // --- 4. INTERACTION EVENTS (Tooltip) ---
+        const tooltip = d3.select("#tooltip");
+
+        rects.on("mouseover", function(event, d) {
+            if (d3.select(this).style("opacity") < 0.5) return; // Ignore faded items
+
+            d3.select(this).style("stroke", "#222").style("stroke-width", 2);
+            
+            tooltip.style("opacity", 1)
+                .html(`
+                    <div style="margin-bottom:4px;"><strong>${d.approach}</strong> vs <strong>${d.attack}</strong></div>
+                    <div style="font-size:15px;">Score: <span style='color:${myColor(d.value)}; font-weight:bold;'>${d.value.toFixed(2)}</span></div>
+                `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
+
+            // Bold Labels
+            svg.selectAll(".x-label").filter(t => t === d.approach).classed("active", true);
+            svg.selectAll(".y-label").filter(t => t === d.attack).classed("active", true);
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 15) + "px");
+        })
+        .on("mouseleave", function() {
+            d3.select(this).style("stroke", "none");
+            tooltip.style("opacity", 0);
+            svg.selectAll(".x-label, .y-label").classed("active", false);
+        });
+
+        // --- 5. INTERACTION LOGIC (Sorting & Filtering) ---
+        
+        // Helper function to run the sort animation
+        function runSort() {
+            const t = svg.transition().duration(1000);
+
+            // 1. Move Rects
+            rects.transition(t)
+                .attr("x", d => x(d.approach))
+                .attr("y", d => y(d.attack));
+
+            // 2. Update Axes
+            renderAxes(t);
+        }
+
+        // Button Bindings using D3
+        d3.select("#btn-orig").on("click", () => {
+            console.log("Sorting: Original");
+            x.domain(approaches);
+            y.domain(attacksOriginal);
+            runSort();
+        });
+
+        d3.select("#btn-best-model").on("click", () => {
+            console.log("Sorting: Best Models");
+            // Sort approaches by Avg descending
+            const sortedModels = [...modelStats].sort((a,b) => b.avg - a.avg).map(d => d.name);
+            x.domain(sortedModels);
+            runSort();
+        });
+
+        d3.select("#btn-hard-attack").on("click", () => {
+            console.log("Sorting: Hardest Attacks");
+            // Sort attacks by Avg ascending (lower score = harder attack)
+            const sortedAttacks = [...attackStats].sort((a,b) => a.avg - b.avg).map(d => d.name);
+            y.domain(sortedAttacks);
+            runSort();
+        });
+
+        // Slider Binding
+        d3.select("#filterSlider").on("input", function() {
+            const val = +this.value;
+            d3.select("#slider-val").text(val);
+            
+            rects.transition().duration(200)
+                .style("opacity", d => d.value < val ? 0.1 : 1)
+                .style("filter", d => d.value < val ? "grayscale(100%)" : "none");
+        });
+
+        // --- 6. LEGEND ---
         const legendHeight = 300;
         const legendWidth = 15;
         const defs = svg.append("defs");
-        const linearGradient = defs.append("linearGradient").attr("id", "linear-gradient");
+        
+        const linearGradient = defs.append("linearGradient").attr("id", "grad1");
         linearGradient.attr("x1", "0%").attr("y1", "100%").attr("x2", "0%").attr("y2", "0%");
         linearGradient.append("stop").attr("offset", "0%").attr("stop-color", myColor(0));
         linearGradient.append("stop").attr("offset", "50%").attr("stop-color", myColor(50));
         linearGradient.append("stop").attr("offset", "100%").attr("stop-color", myColor(100));
 
-        const legend = svg.append("g").attr("transform", `translate(${width + 20}, ${height/2 - legendHeight/2})`);
-        legend.append("rect").attr("width", legendWidth).attr("height", legendHeight).style("fill", "url(#linear-gradient)");
-        
+        const legend = svg.append("g")
+            .attr("transform", `translate(${width + 20}, ${height/2 - legendHeight/2})`);
+
+        legend.append("rect")
+            .attr("width", legendWidth)
+            .attr("height", legendHeight)
+            .style("fill", "url(#grad1)");
+            
         const yLegend = d3.scaleLinear().range([legendHeight, 0]).domain([0, 100]);
-        legend.append("g").attr("transform", `translate(${legendWidth}, 0)`).call(d3.axisRight(yLegend).ticks(5));
-        legend.append("text").attr("x", 0).attr("y", -10).text("Score").style("font-size", "12px");
-
-        // --- 6. INTERACTION LOGIC ---
-
-        // Sorting Functions
-        function sortOriginal() {
-            updateSort(approaches, attacksOriginal);
-        }
-
-        function sortByModelPerformance() {
-            // Sort models by high avg to low avg
-            const sortedModels = [...modelAverages].sort((a, b) => b.avg - a.avg).map(d => d.model);
-            updateSort(sortedModels, null); // Keep current Y order
-        }
-
-        function sortByAttackDifficulty() {
-            // Sort attacks by low avg (hardest) to high avg (easiest)
-            // Or sort by high avg (easy) to low avg (hard). Let's do Hardest (Low score) at top.
-            const sortedAttacks = [...attackAverages].sort((a, b) => a.avg - b.avg).map(d => d.attack);
-            updateSort(null, sortedAttacks); // Keep current X order
-        }
-
-        function updateSort(newXDomain, newYDomain) {
-            const t = svg.transition().duration(1000);
-
-            if (newXDomain) x.domain(newXDomain);
-            if (newYDomain) y.domain(newYDomain);
-
-            // Move Rects
-            svg.selectAll("rect")
-                .transition(t)
-                .attr("x", d => x(d.approach))
-                .attr("y", d => y(d.attack));
-
-            // Update Axes
-            if (newXDomain) {
-                xAxisGroup.transition(t).call(d3.axisBottom(x))
-                    .selectAll("text")
-                    .attr("class", "x-label")
-                    .style("text-anchor", "end")
-                    .attr("dx", "-.8em")
-                    .attr("dy", ".15em")
-                    .attr("transform", "rotate(-45)");
-            }
-            if (newYDomain) {
-                yAxisGroup.transition(t).call(d3.axisLeft(y))
-                    .selectAll("text")
-                    .attr("class", "y-label");
-            }
-        }
-
-        // Filtering Logic
-        d3.select("#filterSlider").on("input", function() {
-            const val = +this.value;
-            d3.select("#slider-val").text(val);
-
-            svg.selectAll("rect")
-                .transition().duration(200)
-                .style("opacity", d => d.value < val ? 0.1 : 1)
-                .style("filter", d => d.value < val ? "grayscale(100%)" : "none");
-        });
+        legend.append("g")
+            .attr("transform", `translate(${legendWidth}, 0)`)
+            .call(d3.axisRight(yLegend).ticks(5));
+            
+        legend.append("text").attr("x", 0).attr("y", -10).text("Score").style("font-size","12px");
 
     </script>
 </body>
