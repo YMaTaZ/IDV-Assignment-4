@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D3.js 数据可视化 - 攻击方法性能分析</title>
+    <title>D3.js Interactive Data Visualization - Attack Defense Performance Analysis</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * {
@@ -19,43 +19,74 @@
             padding: 20px;
         }
         
-        .container {
-            max-width: 1400px;
+        .main-container {
+            max-width: 1600px;
             margin: 0 auto;
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
         }
         
         h1 {
-            text-align: center;
             color: #333;
+            font-size: 32px;
             margin-bottom: 10px;
-            font-size: 28px;
+            font-weight: 700;
         }
         
         .subtitle {
-            text-align: center;
             color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 500;
         }
         
-        .controls {
+        .description {
+            color: #888;
+            font-size: 14px;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        
+        .controls-section {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 20px;
             margin-bottom: 30px;
             flex-wrap: wrap;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
         }
         
         button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            background: #667eea;
-            color: white;
+            padding: 12px 24px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            color: #667eea;
             cursor: pointer;
             font-size: 14px;
             transition: all 0.3s ease;
@@ -63,30 +94,55 @@
         }
         
         button:hover {
-            background: #764ba2;
+            background: #667eea;
+            color: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
         }
         
         button.active {
-            background: #764ba2;
-            box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4);
+            background: #667eea;
+            color: white;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
         }
         
-        .chart-container {
+        .reset-btn {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        .reset-btn:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .info-panel {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .info-panel strong {
+            color: #667eea;
+        }
+        
+        .chart-wrapper {
             display: none;
-            margin-top: 30px;
+            animation: slideIn 0.6s ease-in-out;
         }
         
-        .chart-container.active {
+        .chart-wrapper.active {
             display: block;
-            animation: fadeIn 0.5s ease-in;
         }
         
-        @keyframes fadeIn {
+        @keyframes slideIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
@@ -94,22 +150,27 @@
             }
         }
         
-        #heatmap, #barchart {
-            width: 100%;
-            height: auto;
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
         }
         
         .tooltip {
             position: absolute;
             padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(0, 0, 0, 0.9);
             color: white;
-            border-radius: 6px;
+            border-radius: 8px;
             pointer-events: none;
             font-size: 13px;
             z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
             white-space: nowrap;
+            font-weight: 500;
         }
         
         .axis-label {
@@ -117,49 +178,146 @@
             fill: #333;
         }
         
+        .axis-title {
+            font-size: 14px;
+            fill: #333;
+            font-weight: 600;
+        }
+        
         .legend {
             margin-top: 20px;
-            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
             font-size: 12px;
             color: #666;
         }
         
-        .filter-info {
-            text-align: center;
-            margin: 15px 0;
-            color: #764ba2;
+        .legend-title {
             font-weight: 600;
-            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
         }
         
-        .reset-btn {
-            background: #ff6b6b;
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
         }
         
-        .reset-btn:hover {
-            background: #ee5a52;
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        svg {
+            overflow: visible;
+        }
+        
+        .grid-line {
+            stroke: #e0e0e0;
+            stroke-dasharray: 4;
+            opacity: 0.5;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎯 攻击方法性能分析系统</h1>
-        <p class="subtitle">基于多种攻击类型和防御方法的准确率对比</p>
+    <div class="main-container">
+        <header>
+            <h1>🎯 Attack Defense Performance Analysis System</h1>
+            <p class="subtitle">Interactive D3.js Data Visualization Dashboard</p>
+            <p class="description">Comprehensive analysis of 26 attack types across 9 defense methods with real-time interactions</p>
+        </header>
         
-        <div class="controls">
-            <button class="chart-btn active" data-chart="heatmap">📊 热力图</button>
-            <button class="chart-btn" data-chart="barchart">📈 分组柱状图</button>
-            <button class="reset-btn" id="resetBtn">🔄 重置过滤</button>
+        <div class="controls-section">
+            <div class="control-group">
+                <label>📊 Chart Type:</label>
+                <button class="chart-btn active" data-chart="heatmap">Heatmap</button>
+                <button class="chart-btn" data-chart="barchart">Grouped Bar Chart</button>
+                <button class="chart-btn" data-chart="linechart">Line Chart</button>
+            </div>
+            <div class="control-group">
+                <button class="reset-btn" id="resetBtn">🔄 Reset All Filters</button>
+            </div>
         </div>
         
-        <div id="filterInfo" class="filter-info"></div>
+        <div class="info-panel">
+            <strong>📈 Dataset Information:</strong> <span id="dataInfo">Displaying 26 attack types × 9 defense methods = 234 data points</span>
+        </div>
         
-        <div id="heatmap" class="chart-container active"></div>
-        <div id="barchart" class="chart-container"></div>
+        <!-- Heatmap Chart -->
+        <div id="heatmapContainer" class="chart-wrapper active">
+            <div class="chart-title">🔥 Heatmap: Accuracy Distribution Across Attacks and Methods</div>
+            <div id="heatmap"></div>
+            <div class="legend">
+                <div class="legend-title">Legend:</div>
+                <div>🔴 Red (0%): Low accuracy | 🟡 Yellow (50%): Medium accuracy | 🟢 Green (100%): High accuracy</div>
+                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Hover over cells to see exact values</div>
+            </div>
+        </div>
+        
+        <!-- Bar Chart -->
+        <div id="barchartContainer" class="chart-wrapper">
+            <div class="chart-title">📊 Grouped Bar Chart: Method Comparison by Attack Type</div>
+            <div id="barchart"></div>
+            <div class="legend">
+                <div class="legend-title">Legend:</div>
+                <div>Each group represents an attack type, with bars showing accuracy for each defense method</div>
+                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Hover over bars to highlight and view details</div>
+            </div>
+        </div>
+        
+        <!-- Line Chart -->
+        <div id="linechartContainer" class="chart-wrapper">
+            <div class="chart-title">📈 Line Chart: Accuracy Trends by Defense Method</div>
+            <div id="linechart"></div>
+            <div class="legend">
+                <div class="legend-title">Legend:</div>
+                <div>Each line represents a defense method, showing how accuracy varies across different attacks</div>
+                <div style="margin-top: 10px; color: #667eea; font-weight: 600;">💡 Interaction: Click on legend items to toggle visibility, hover for details</div>
+            </div>
+        </div>
+        
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-value" id="totalAttacks">26</div>
+                <div class="stat-label">Total Attack Types</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalMethods">9</div>
+                <div class="stat-label">Defense Methods</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgAccuracy">0%</div>
+                <div class="stat-label">Average Accuracy</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="maxAccuracy">0%</div>
+                <div class="stat-label">Maximum Accuracy</div>
+            </div>
+        </div>
     </div>
     
     <script>
-        // 数据定义
+        // ==================== DATA DEFINITION ====================
         const rawData = [
             { Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23 },
             { Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80 },
@@ -191,18 +349,33 @@
         
         const methods = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
         let filteredData = JSON.parse(JSON.stringify(rawData));
-        let selectedMethod = null;
         
-        // 创建工具提示
+        // ==================== TOOLTIP ====================
         const tooltip = d3.select("body").append("div")
             .attr("class", "tooltip")
             .style("opacity", 0);
         
-        // 热力图函数
+        // ==================== STATISTICS CALCULATION ====================
+        function updateStatistics() {
+            let allValues = [];
+            filteredData.forEach(d => {
+                methods.forEach(m => {
+                    allValues.push(d[m]);
+                });
+            });
+            
+            const avgAccuracy = (allValues.reduce((a, b) => a + b, 0) / allValues.length).toFixed(2);
+            const maxAccuracy = Math.max(...allValues).toFixed(2);
+            
+            document.getElementById("avgAccuracy").textContent = avgAccuracy + "%";
+            document.getElementById("maxAccuracy").textContent = maxAccuracy + "%";
+        }
+        
+        // ==================== HEATMAP CHART ====================
         function drawHeatmap() {
-            const margin = { top: 40, right: 30, bottom: 150, left: 120 };
-            const width = 1200 - margin.left - margin.right;
-            const height = 600 - margin.top - margin.bottom;
+            const margin = { top: 60, right: 60, bottom: 200, left: 150 };
+            const width = 1400 - margin.left - margin.right;
+            const height = 700 - margin.top - margin.bottom;
             
             d3.select("#heatmap").html("");
             
@@ -212,7 +385,7 @@
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
             
-            // 数据转换
+            // Transform data
             const heatmapData = [];
             filteredData.forEach(d => {
                 methods.forEach(method => {
@@ -224,22 +397,22 @@
                 });
             });
             
-            // 比例尺
+            // Scales
             const xScale = d3.scaleBand()
                 .domain(methods)
                 .range([0, width])
-                .padding(0.02);
+                .padding(0.05);
             
             const yScale = d3.scaleBand()
                 .domain(filteredData.map(d => d.Attack))
                 .range([0, height])
-                .padding(0.02);
+                .padding(0.05);
             
             const colorScale = d3.scaleLinear()
                 .domain([0, 50, 100])
                 .range(["#d73027", "#fee090", "#1a9850"]);
             
-            // 绘制单元格
+            // Draw cells with transition
             svg.selectAll("rect")
                 .data(heatmapData)
                 .enter()
@@ -250,41 +423,43 @@
                 .attr("height", yScale.bandwidth())
                 .attr("fill", "#f0f0f0")
                 .transition()
-                .duration(1000)
-                .attr("fill", d => colorScale(d.value))
-                .on("end", function() {
-                    d3.select(this).style("cursor", "pointer");
-                });
+                .duration(1200)
+                .ease(d3.easeQuadInOut)
+                .attr("fill", d => colorScale(d.value));
             
-            // 交互功能
+            // Interactions
             svg.selectAll("rect")
                 .on("mouseover", function(event, d) {
                     d3.select(this)
                         .transition()
-                        .duration(200)
+                        .duration(150)
                         .attr("stroke", "#333")
-                        .attr("stroke-width", 2);
+                        .attr("stroke-width", 3);
                     
                     tooltip.transition()
-                        .duration(200)
-                        .style("opacity", 0.95);
+                        .duration(150)
+                        .style("opacity", 1);
                     
-                    tooltip.html(`<strong>${d.method}</strong><br/>攻击: ${d.attack}<br/>准确率: ${d.value.toFixed(2)}%`)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 28) + "px");
+                    tooltip.html(`
+                        <strong>${d.method}</strong><br/>
+                        Attack: ${d.attack}<br/>
+                        Accuracy: <strong>${d.value.toFixed(2)}%</strong>
+                    `)
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 35) + "px");
                 })
                 .on("mouseout", function() {
                     d3.select(this)
                         .transition()
-                        .duration(200)
+                        .duration(150)
                         .attr("stroke", "none");
                     
                     tooltip.transition()
-                        .duration(200)
+                        .duration(150)
                         .style("opacity", 0);
                 });
             
-            // X轴
+            // X Axis
             svg.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(xScale))
@@ -293,47 +468,52 @@
                 .attr("text-anchor", "start")
                 .attr("class", "axis-label");
             
-            // Y轴
+            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale))
                 .selectAll("text")
                 .attr("class", "axis-label");
             
-            // 图例
-            const legendData = [
-                { value: 0, label: "0%" },
-                { value: 50, label: "50%" },
-                { value: 100, label: "100%" }
-            ];
+            // Legend
+            const legendWidth = 300;
+            const legendX = width + 20;
+            const legendGroup = svg.append("g")
+                .attr("transform", `translate(${legendX}, 0)`);
             
-            const legend = svg.append("g")
-                .attr("transform", `translate(${width + 20}, 0)`);
+            const legendScale = d3.scaleLinear()
+                .domain([0, 100])
+                .range([0, legendWidth]);
             
-            legend.selectAll("rect")
-                .data(legendData)
+            const legendAxis = d3.axisBottom(legendScale)
+                .ticks(5)
+                .tickFormat(d => d + "%");
+            
+            legendGroup.append("defs").append("linearGradient")
+                .attr("id", "legend-gradient")
+                .attr("x1", "0%").attr("x2", "100%")
+                .selectAll("stop")
+                .data(d3.range(0, 101, 1))
                 .enter()
-                .append("rect")
-                .attr("x", 0)
-                .attr("y", (d, i) => i * 30)
-                .attr("width", 20)
+                .append("stop")
+                .attr("offset", d => d + "%")
+                .attr("stop-color", d => colorScale(d));
+            
+            legendGroup.append("rect")
+                .attr("width", legendWidth)
                 .attr("height", 20)
-                .attr("fill", d => colorScale(d.value));
+                .attr("fill", "url(#legend-gradient)");
             
-            legend.selectAll("text")
-                .data(legendData)
-                .enter()
-                .append("text")
-                .attr("x", 30)
-                .attr("y", (d, i) => i * 30 + 15)
-                .attr("font-size", "12px")
-                .text(d => d.label);
+            legendGroup.append("g")
+                .attr("transform", `translate(0,20)`)
+                .call(legendAxis)
+                .attr("class", "axis-label");
         }
         
-        // 分组柱状图函数
+        // ==================== BAR CHART ====================
         function drawBarchart() {
-            const margin = { top: 40, right: 30, bottom: 80, left: 80 };
-            const width = 1200 - margin.left - margin.right;
-            const height = 600 - margin.top - margin.bottom;
+            const margin = { top: 60, right: 40, bottom: 200, left: 80 };
+            const width = 1400 - margin.left - margin.right;
+            const height = 700 - margin.top - margin.bottom;
             
             d3.select("#barchart").html("");
             
@@ -343,7 +523,7 @@
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
             
-            // 比例尺
+            // Scales
             const xScale = d3.scaleBand()
                 .domain(filteredData.map(d => d.Attack))
                 .range([0, width])
@@ -362,7 +542,15 @@
                 .domain(methods)
                 .range(d3.schemeSet2);
             
-            // 绘制柱子
+            // Grid lines
+            svg.append("g")
+                .attr("class", "grid-line")
+                .call(d3.axisLeft(yScale)
+                    .tickSize(-width)
+                    .tickFormat("")
+                );
+            
+            // Draw bars
             svg.selectAll("g.attack")
                 .data(filteredData)
                 .enter()
@@ -380,41 +568,46 @@
                 .attr("fill", d => colorScale(d.method))
                 .transition()
                 .duration(1000)
-                .delay((d, i) => i * 50)
+                .delay((d, i) => i * 30)
+                .ease(d3.easeBackOut)
                 .attr("y", d => yScale(d.value))
                 .attr("height", d => height - yScale(d.value));
             
-            // 交互功能
+            // Interactions
             svg.selectAll("rect")
                 .on("mouseover", function(event, d) {
                     d3.select(this)
                         .transition()
-                        .duration(200)
+                        .duration(150)
                         .attr("opacity", 0.7)
                         .attr("stroke", "#333")
                         .attr("stroke-width", 2);
                     
                     tooltip.transition()
-                        .duration(200)
-                        .style("opacity", 0.95);
+                        .duration(150)
+                        .style("opacity", 1);
                     
-                    tooltip.html(`<strong>${d.method}</strong><br/>攻击: ${d.attack}<br/>准确率: ${d.value.toFixed(2)}%`)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 28) + "px");
+                    tooltip.html(`
+                        <strong>${d.method}</strong><br/>
+                        Attack: ${d.attack}<br/>
+                        Accuracy: <strong>${d.value.toFixed(2)}%</strong>
+                    `)
+                        .style("left", (event.pageX + 15) + "px")
+                        .style("top", (event.pageY - 35) + "px");
                 })
                 .on("mouseout", function() {
                     d3.select(this)
                         .transition()
-                        .duration(200)
+                        .duration(150)
                         .attr("opacity", 1)
                         .attr("stroke", "none");
                     
                     tooltip.transition()
-                        .duration(200)
+                        .duration(150)
                         .style("opacity", 0);
                 });
             
-            // X轴
+            // X Axis
             svg.append("g")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(xScale))
@@ -423,7 +616,7 @@
                 .attr("text-anchor", "start")
                 .attr("class", "axis-label");
             
-            // Y轴
+            // Y Axis
             svg.append("g")
                 .call(d3.axisLeft(yScale))
                 .append("text")
@@ -432,71 +625,9 @@
                 .attr("x", 0 - (height / 2))
                 .attr("dy", "1em")
                 .style("text-anchor", "middle")
-                .text("准确率 (%)")
-                .attr("class", "axis-label");
+                .attr("class", "axis-title")
+                .text("Accuracy (%)");
             
-            // 图例
+            // Legend
             const legend = svg.append("g")
-                .attr("transform", `translate(${width - 150}, -30)`);
-            
-            legend.selectAll("rect")
-                .data(methods)
-                .enter()
-                .append("rect")
-                .attr("x", 0)
-                .attr("y", (d, i) => i * 20)
-                .attr("width", 15)
-                .attr("height", 15)
-                .attr("fill", d => colorScale(d));
-            
-            legend.selectAll("text")
-                .data(methods)
-                .enter()
-                .append("text")
-                .attr("x", 20)
-                .attr("y", (d, i) => i * 20 + 12)
-                .attr("font-size", "12px")
-                .text(d => d);
-        }
-        
-        // 事件监听
-        document.querySelectorAll(".chart-btn").forEach(btn => {
-            btn.addEventListener("click", function() {
-                document.querySelectorAll(".chart-btn").forEach(b => b.classList.remove("active"));
-                this.classList.add("active");
-                
-                document.querySelectorAll(".chart-container").forEach(c => c.classList.remove("active"));
-                
-                const chart = this.dataset.chart;
-                if (chart === "heatmap") {
-                    document.getElementById("heatmap").classList.add("active");
-                    drawHeatmap();
-                } else {
-                    document.getElementById("barchart").classList.add("active");
-                    drawBarchart();
-                }
-            });
-        });
-        
-        document.getElementById("resetBtn").addEventListener("click", function() {
-            filteredData = JSON.parse(JSON.stringify(rawData));
-            selectedMethod = null;
-            updateFilterInfo();
-            drawHeatmap();
-        });
-        
-        function updateFilterInfo() {
-            const info = document.getElementById("filterInfo");
-            if (selectedMethod) {
-                info.textContent = `✓ 已过滤: 仅显示 ${selectedMethod} 方法的数据 | 共 ${filteredData.length} 种攻击类型`;
-            } else {
-                info.textContent = `显示全部 ${filteredData.length} 种攻击类型 × ${methods.length} 种防御方法`;
-            }
-        }
-        
-        // 初始化
-        updateFilterInfo();
-        drawHeatmap();
-    </script>
-</body>
-</html>
+                .attr("transform", `translate(${width - 200}, -
