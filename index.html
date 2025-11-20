@@ -1,21 +1,4 @@
-这是一份完全符合IDV Assignment 4要求的HTML文件。你可以直接将其部署在GitHub Pages上。
 
-### 代码说明：
-1.  **数据处理 (Data Options)**: 我已经手动将图片中的表格数据（Data Option 2: Lots of Data）完整转录为JSON格式，并嵌入代码中。
-2.  **图表选择**: 选择了 **Heatmap (热力图)**。
-    *   *原因*: 数据是一个 $26 \times 9$ 的矩阵，热力图最适合展示这种密集数据，可以通过颜色的深浅直观地对比不同攻击方式（行）下不同模型（列）的表现（数值越高颜色越绿/深）。
-3.  **交互 (Interaction)**:
-    *   **Tooltip**: 鼠标悬停在方格上时，会显示具体的数值、攻击类型和模型名称。
-    *   **Highlight**: 悬停时，当前方格高亮，且对应的X轴和Y轴标签会变粗变色，帮助视线定位。
-4.  **过渡动画 (Transition)**:
-    *   图表加载时，方格会按照对角线顺序依次浮现（Opacity fade-in），满足"non-interaction-triggered transition"的要求。
-
-### 使用方法：
-1.  新建一个文件，命名为 `index.html`。
-2.  将下面的代码完整复制进去。
-3.  将该文件上传到你的 GitHub 仓库，并开启 GitHub Pages 即可预览。
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -331,4 +314,4 @@
     </script>
 </body>
 </html>
-```
+
